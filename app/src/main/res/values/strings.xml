@@ -1,0 +1,7 @@
+<resources>
+    <string name="app_name">ParallelCompute</string>
+    <string name="SelectCPU">Select CPU or GPU processing</string>
+    <string name="CPU">CPU</string>
+    <string name="GPU">GPU</string>
+    <string name="SNAP">SNAP!</string>
+</resources>
