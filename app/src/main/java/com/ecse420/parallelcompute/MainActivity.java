@@ -7,7 +7,7 @@ import android.os.Bundle;
 import android.provider.MediaStore;
 import android.Manifest;
 import android.widget.Switch;
-
+import android.view.View;
 
 import androidx.activity.EdgeToEdge;
 import androidx.annotation.NonNull;
@@ -20,6 +20,11 @@ import androidx.core.view.ViewCompat;
 import androidx.core.view.WindowInsetsCompat;
 import androidx.databinding.DataBindingUtil;
 
+import android.widget.Toast;
+import android.widget.Spinner;
+import android.widget.AdapterView;
+import android.widget.ArrayAdapter;
+
 import com.ecse420.parallelcompute.databinding.ActivityMainBinding;
 
 import java.io.ByteArrayOutputStream;
@@ -31,6 +36,11 @@ public class MainActivity extends AppCompatActivity {
     private static final int CAMERA_REQUEST_CODE = 100;
     private static final int CAMERA_PERMISSION_CODE = 101;
 
+    private Spinner transformationSpinner;
+    private String selectedTransformation = "Grayscale";
+
+    private String[] transformations = {"Grayscale", "Blur", "Rotate 90°", "Scale Down"};
+    
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -42,8 +52,32 @@ public class MainActivity extends AppCompatActivity {
             return insets;
         });
         bo = DataBindingUtil.setContentView(this, R.layout.activity_main);
+        setupTransformationSpinner();
         onSwitchPressed();
         onCameraClick();
+    }
+
+    private void setupTransformationSpinner() {
+        transformationSpinner = bo.transformationSpinner;
+
+        ArrayAdapter<String> adapter = new ArrayAdapter<>(
+            this, android.R.layout.simple_spinner_item, transformations
+        );
+        adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+        transformationSpinner.setAdapter(adapter);
+
+        transformationSpinner.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
+            @Override
+            public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
+                selectedTransformation = parent.getItemAtPosition(position).toString();
+                Toast.makeText(MainActivity.this, "Selected: " + selectedTransformation, Toast.LENGTH_SHORT).show();
+            }
+
+            @Override
+            public void onNothingSelected(AdapterView<?> parent) {
+                selectedTransformation = "Grayscale";
+            }
+        });
     }
 
     private void onSwitchPressed() {
@@ -103,13 +137,25 @@ public class MainActivity extends AppCompatActivity {
             Bitmap photo = (Bitmap) data.getExtras().get("data");
             assert photo != null;
 
-            // CPU start time
             long cpuStart = android.os.Debug.threadCpuTimeNanos();
 
-            // Grayscale transformation
-            Bitmap transformed = toGrayscale(photo);
+            Bitmap transformed;
+            switch (selectedTransformation) {
+                case "Blur":
+                    transformed = applyBlur(photo);
+                    break;
+                case "Rotate 90°":
+                    transformed = rotateImage(photo, 90);
+                    break;
+                case "Scale Down":
+                    transformed = scaleImage(photo, 0.5f);
+                    break;
+                case "Grayscale":
+                default:
+                    transformed = toGrayscale(photo);
+                    break;
+            }
 
-            // CPU end time
             long cpuEnd = android.os.Debug.threadCpuTimeNanos();
 
             long cpuTime = (cpuEnd - cpuStart) / 1_000_000; // convert ns to ms
@@ -131,8 +177,6 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
-
-
     private Bitmap toGrayscale(Bitmap original) {
         int width = original.getWidth();
         int height = original.getHeight();
@@ -152,4 +196,63 @@ public class MainActivity extends AppCompatActivity {
         return gray;
     }
 
+    private Bitmap applyBlur(Bitmap original) {
+        int width = original.getWidth();
+        int height = original.getHeight();
+        Bitmap blurred = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888);
+        
+        for (int y = 1; y < height - 1; y++) {
+            for (int x = 1; x < width - 1; x++) {
+                int avgR = 0, avgG = 0, avgB = 0;
+                
+                // 3x3 kernel
+                for (int ky = -1; ky <= 1; ky++) {
+                    for (int kx = -1; kx <= 1; kx++) {
+                        int pixel = original.getPixel(x + kx, y + ky);
+                        avgR += (pixel >> 16) & 0xff;
+                        avgG += (pixel >> 8) & 0xff;
+                        avgB += pixel & 0xff;
+                    }
+                }
+                
+                avgR /= 9;
+                avgG /= 9;
+                avgB /= 9;
+                
+                int newPixel = 0xFF000000 | (avgR << 16) | (avgG << 8) | avgB;
+                blurred.setPixel(x, y, newPixel);
+            }
+        }
+        return blurred;
+    }
+    
+    private Bitmap rotateImage(Bitmap original, int degrees) {
+        int width = original.getWidth();
+        int height = original.getHeight();
+        
+        Bitmap rotated = Bitmap.createBitmap(height, width, Bitmap.Config.ARGB_8888);
+        
+        for (int y = 0; y < height; y++) {
+            for (int x = 0; x < width; x++) {
+                rotated.setPixel(y, width - 1 - x, original.getPixel(x, y));
+            }
+        }
+        return rotated;
+    }
+    
+    private Bitmap scaleImage(Bitmap original, float scaleFactor) {
+        int newWidth = (int)(original.getWidth() * scaleFactor);
+        int newHeight = (int)(original.getHeight() * scaleFactor);
+        
+        Bitmap scaled = Bitmap.createBitmap(newWidth, newHeight, Bitmap.Config.ARGB_8888);
+        
+        for (int y = 0; y < newHeight; y++) {
+            for (int x = 0; x < newWidth; x++) {
+                int srcX = (int)(x / scaleFactor);
+                int srcY = (int)(y / scaleFactor);
+                scaled.setPixel(x, y, original.getPixel(srcX, srcY));
+            }
+        }
+        return scaled;
+    }
 }
