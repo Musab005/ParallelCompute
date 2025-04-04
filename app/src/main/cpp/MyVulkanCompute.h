@@ -1,0 +1,14 @@
+//
+// Created by musab on 2025-04-04.
+//
+
+#ifndef PARALLELCOMPUTE_MYVULKANCOMPUTE_H
+#define PARALLELCOMPUTE_MYVULKANCOMPUTE_H
+
+
+class MyVulkanCompute {
+
+};
+
+
+#endif //PARALLELCOMPUTE_MYVULKANCOMPUTE_H

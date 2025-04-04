@@ -11,7 +11,23 @@ android {
         dataBinding = true
     }
 
+    externalNativeBuild {
+        cmake {
+            path = file("src/main/cpp/CMakeLists.txt")
+        }
+    }
+
     defaultConfig {
+        externalNativeBuild {
+            cmake {
+                // Optional: set your C++ flags
+                // cppFlags("-std=c++17")
+            }
+        }
+        ndk {
+            // You can choose your supported ABIs
+            abiFilters += listOf("arm64-v8a")
+        }
         applicationId = "com.ecse420.parallelcompute"
         minSdk = 33
         targetSdk = 33
