@@ -46,6 +46,10 @@ public class MainActivity extends AppCompatActivity {
 
     private String[] transformations = {"Grayscale", "Blur", "Rotate 90°", "Scale Down"};
 
+    // Store paths to the two SPIR-V shaders
+    private String spvPath;       // for grayscale
+    private String blurSpvPath;   // for blur
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -56,13 +60,17 @@ public class MainActivity extends AppCompatActivity {
             v.setPadding(systemBars.left, systemBars.top, systemBars.right, systemBars.bottom);
             return insets;
         });
-        // 1) Copy raw resource to internal storage
+
+        // 1) Copy raw resources to internal storage
         copyShaderFromRawIfNeeded(R.raw.grayacale_spv, "grayacale_spv");
+        copyShaderFromRawIfNeeded(R.raw.blur_comp_spv, "blur_spv");
 
-        // 2) Build the absolute path to this internal file
-        String spvPath = new File(getFilesDir(), "grayacale_spv").getAbsolutePath();
+        // 2) Build the absolute paths
+        spvPath     = new File(getFilesDir(), "grayacale_spv").getAbsolutePath();
+        blurSpvPath = new File(getFilesDir(), "blur_spv").getAbsolutePath();
 
-        // 3) Now call Vulkan init with a real path
+        // 3) By default, init Vulkan with the grayscale path
+        //    (just to have something loaded)
         NativeVulkan.initVulkan(spvPath);
 
         bo = DataBindingUtil.setContentView(this, R.layout.activity_main);
@@ -72,7 +80,6 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void copyShaderFromRawIfNeeded(int rawResId, String outFileName) {
-        // outFileName is something like "grayacale_spv"
         File outFile = new File(getFilesDir(), outFileName);
         if (outFile.exists()) {
             // already copied
@@ -175,62 +182,85 @@ public class MainActivity extends AppCompatActivity {
 
             Bitmap transformed;
             long timeMs;
-            String mode;  // <-- This indicates CPU or GPU.
+            String mode;  // "CPU" or "GPU"
 
-            // Check if the switch is toggled to GPU AND grayscale is selected
-            if (aSwitch.isChecked() && "Grayscale".equals(selectedTransformation)) {
-                // ==============================
-                // GPU path (Vulkan Grayscale)
-                // ==============================
+            int width = photo.getWidth();
+            int height = photo.getHeight();
 
-                // 1) Convert Bitmap to RGBA ByteBuffer
-                int width = photo.getWidth();
-                int height = photo.getHeight();
-                ByteBuffer inBuffer = ByteBuffer.allocateDirect(width * height * 4);
-                photo.copyPixelsToBuffer(inBuffer);
-                inBuffer.rewind();
+            // Check if GPU is toggled
+            if (aSwitch.isChecked()) {
+                if ("Grayscale".equals(selectedTransformation)) {
+                    // ====================================
+                    // GPU path - Use grayscale shader
+                    // ====================================
 
-                // 2) Prepare output buffer
-                ByteBuffer outBuffer = ByteBuffer.allocateDirect(width * height * 4);
+                    // Re-init Vulkan with the grayscale pipeline
+                    NativeVulkan.cleanupVulkan();
+                    NativeVulkan.initVulkan(spvPath);
 
-                // 3) Dispatch to Vulkan
-                long gpuStart = System.nanoTime();
-                NativeVulkan.runComputeShader(inBuffer, width, height, outBuffer);
-                long gpuEnd = System.nanoTime();
-                timeMs = (gpuEnd - gpuStart) / 1_000_000;
-                mode = "GPU";  // We'll label it GPU time
+                    ByteBuffer inBuffer = ByteBuffer.allocateDirect(width * height * 4);
+                    photo.copyPixelsToBuffer(inBuffer);
+                    inBuffer.rewind();
 
-                // 4) Copy result back into a Bitmap
-                outBuffer.rewind();
-                transformed = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888);
-                transformed.copyPixelsFromBuffer(outBuffer);
+                    ByteBuffer outBuffer = ByteBuffer.allocateDirect(width * height * 4);
 
-            } else {
-                // =========================
-                // CPU path (existing code)
-                // =========================
+                    long gpuStart = System.nanoTime();
+                    NativeVulkan.runComputeShader(inBuffer, width, height, outBuffer);
+                    long gpuEnd = System.nanoTime();
+                    timeMs = (gpuEnd - gpuStart) / 1_000_000;
+                    mode = "GPU";
 
-                long cpuStart = android.os.Debug.threadCpuTimeNanos();
+                    outBuffer.rewind();
+                    transformed = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888);
+                    transformed.copyPixelsFromBuffer(outBuffer);
 
-                switch (selectedTransformation) {
-                    case "Blur":
-                        transformed = applyBlur(photo);
-                        break;
-                    case "Rotate 90°":
-                        transformed = rotateImage(photo, 90);
-                        break;
-                    case "Scale Down":
-                        transformed = scaleImage(photo, 0.5f);
-                        break;
-                    case "Grayscale":
-                    default:
-                        transformed = toGrayscale(photo);
-                        break;
+                } else if ("Blur".equals(selectedTransformation)) {
+                    // ====================================
+                    // GPU path - Use blur shader
+                    // ====================================
+
+                    // Re-init Vulkan with the blur pipeline
+                    NativeVulkan.cleanupVulkan();
+                    NativeVulkan.initVulkan(blurSpvPath);
+
+                    ByteBuffer inBuffer = ByteBuffer.allocateDirect(width * height * 4);
+                    photo.copyPixelsToBuffer(inBuffer);
+                    inBuffer.rewind();
+
+                    ByteBuffer outBuffer = ByteBuffer.allocateDirect(width * height * 4);
+
+                    long gpuStart = System.nanoTime();
+                    NativeVulkan.runComputeShader(inBuffer, width, height, outBuffer);
+                    long gpuEnd = System.nanoTime();
+                    timeMs = (gpuEnd - gpuStart) / 1_000_000;
+                    mode = "GPU";
+
+                    outBuffer.rewind();
+                    transformed = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888);
+                    transformed.copyPixelsFromBuffer(outBuffer);
+
+                } else {
+                    // ====================================
+                    // GPU is on but transformation is not
+                    // Grayscale or Blur => fallback to CPU
+                    // ====================================
+                    long cpuStart = android.os.Debug.threadCpuTimeNanos();
+                    transformed = applyCpuTransform(photo);
+                    long cpuEnd = android.os.Debug.threadCpuTimeNanos();
+
+                    timeMs = (cpuEnd - cpuStart) / 1_000_000;
+                    mode = "CPU";
                 }
-
+            } else {
+                // ====================================
+                // CPU path
+                // ====================================
+                long cpuStart = android.os.Debug.threadCpuTimeNanos();
+                transformed = applyCpuTransform(photo);
                 long cpuEnd = android.os.Debug.threadCpuTimeNanos();
-                timeMs = (cpuEnd - cpuStart) / 1_000_000; // ns → ms
-                mode = "CPU";  // We'll label it CPU time
+
+                timeMs = (cpuEnd - cpuStart) / 1_000_000;
+                mode = "CPU";
             }
 
             // ============================
@@ -249,108 +279,29 @@ public class MainActivity extends AppCompatActivity {
             intent.putExtra("original_image", originalBytes);
             intent.putExtra("transformed_image", transformedBytes);
 
-            // Instead of "cpu_time", let's name it "processing_time" for clarity
             intent.putExtra("processing_time", timeMs);
-            // Put the mode as well, so we know how to label it
             intent.putExtra("processing_mode", mode);
 
             startActivity(intent);
         }
     }
 
-
-//    @Override
-//    protected void onActivityResult(int requestCode,
-//                                    int resultCode,
-//                                    @Nullable Intent data) {
-//        super.onActivityResult(requestCode, resultCode, data);
-//
-//        if (requestCode == CAMERA_REQUEST_CODE &&
-//                resultCode == RESULT_OK && data != null) {
-//
-//            Bitmap photo = (Bitmap) data.getExtras().get("data");
-//            assert photo != null;
-//
-//            Bitmap transformed;
-//            long timeMs;
-//
-//            // Check if the switch is toggled to GPU
-//            if (aSwitch.isChecked() && "Grayscale".equals(selectedTransformation)) {
-//                // ==============================
-//                // GPU path (Vulkan Grayscale)
-//                // ==============================
-//
-//                // 1) Convert Bitmap to RGBA ByteBuffer
-//                int width = photo.getWidth();
-//                int height = photo.getHeight();
-//                ByteBuffer inBuffer = ByteBuffer.allocateDirect(width * height * 4);
-//                photo.copyPixelsToBuffer(inBuffer);
-//                inBuffer.rewind();
-//
-//                // 2) Prepare output buffer
-//                ByteBuffer outBuffer = ByteBuffer.allocateDirect(width * height * 4);
-//
-//                // 3) Dispatch to Vulkan
-//                long gpuStart = System.nanoTime();
-//                NativeVulkan.runComputeShader(inBuffer, width, height, outBuffer);
-//                long gpuEnd = System.nanoTime();
-//                timeMs = (gpuEnd - gpuStart) / 1_000_000;
-//
-//                // 4) Copy result back into a Bitmap
-//                outBuffer.rewind();
-//                transformed = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888);
-//                transformed.copyPixelsFromBuffer(outBuffer);
-//
-//            } else {
-//                // =========================
-//                // CPU path (existing code)
-//                // =========================
-//
-//                long cpuStart = android.os.Debug.threadCpuTimeNanos();
-//
-//                switch (selectedTransformation) {
-//                    case "Blur":
-//                        transformed = applyBlur(photo);
-//                        break;
-//                    case "Rotate 90°":
-//                        transformed = rotateImage(photo, 90);
-//                        break;
-//                    case "Scale Down":
-//                        transformed = scaleImage(photo, 0.5f);
-//                        break;
-//                    case "Grayscale":
-//                    default:
-//                        transformed = toGrayscale(photo);
-//                        break;
-//                }
-//
-//                long cpuEnd = android.os.Debug.threadCpuTimeNanos();
-//                timeMs = (cpuEnd - cpuStart) / 1_000_000; // ns → ms
-//            }
-//
-//            // ============================
-//            // Prepare data for next Activity
-//            // ============================
-//            ByteArrayOutputStream originalStream = new ByteArrayOutputStream();
-//            photo.compress(Bitmap.CompressFormat.PNG, 100, originalStream);
-//            byte[] originalBytes = originalStream.toByteArray();
-//
-//            ByteArrayOutputStream transformedStream = new ByteArrayOutputStream();
-//            transformed.compress(Bitmap.CompressFormat.PNG, 100, transformedStream);
-//            byte[] transformedBytes = transformedStream.toByteArray();
-//
-//            // Intent to ImageCaptured
-//            Intent intent = new Intent(this, ImageCaptured.class);
-//            intent.putExtra("original_image", originalBytes);
-//            intent.putExtra("transformed_image", transformedBytes);
-//
-//            // We reuse the key "cpu_time" for demonstration; you might rename it to "processing_time".
-//            intent.putExtra("cpu_time", timeMs);
-//
-//            startActivity(intent);
-//        }
-//    }
-
+    /**
+     * CPU-based fallback transformations
+     */
+    private Bitmap applyCpuTransform(Bitmap photo) {
+        switch (selectedTransformation) {
+            case "Blur":
+                return applyBlur(photo);
+            case "Rotate 90°":
+                return rotateImage(photo, 90);
+            case "Scale Down":
+                return scaleImage(photo, 0.5f);
+            case "Grayscale":
+            default:
+                return toGrayscale(photo);
+        }
+    }
 
     private Bitmap toGrayscale(Bitmap original) {
         int width = original.getWidth();

@@ -64,32 +64,6 @@ public class ImageCaptured extends AppCompatActivity {
     }
 
 
-//    private void display() {
-//        ImageView originalImage = findViewById(R.id.capturedImage);
-//        ImageView transformedImage = findViewById(R.id.processedImage);
-//        TextView performanceSummary = findViewById(R.id.PerformanceText);
-//
-//        byte[] originalBytes = getIntent().getByteArrayExtra("original_image");
-//        byte[] transformedBytes = getIntent().getByteArrayExtra("transformed_image");
-//
-//        long cpuTime = getIntent().getLongExtra("cpu_time", 0);
-//
-//        if (originalBytes != null) {
-//            Bitmap bitmap = BitmapFactory.decodeByteArray(originalBytes, 0, originalBytes.length);
-//            originalImage.setImageBitmap(bitmap);
-//        }
-//
-//        if (transformedBytes != null) {
-//            Bitmap bitmap2 = BitmapFactory.decodeByteArray(transformedBytes, 0, transformedBytes.length);
-//            transformedImage.setImageBitmap(bitmap2);
-//        }
-//
-//        String summary = "CPU time: " + cpuTime + " ms\n";
-//
-//
-//        performanceSummary.setText(summary);
-//    }
-
     private void onDoneClicked() {
         Button doneBtn = findViewById(R.id.DoneBtn);
         doneBtn.setOnClickListener(v -> {
