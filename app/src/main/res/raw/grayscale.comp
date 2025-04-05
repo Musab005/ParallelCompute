@@ -1,0 +1,18 @@
+#version 450
+
+layout(local_size_x = 8, local_size_y = 8) in;
+
+// Input image
+layout(binding = 0, rgba8) readonly  uniform image2D inImage;
+// Output image
+layout(binding = 1, rgba8) writeonly uniform image2D outImage;
+
+void main() {
+    ivec2 coords = ivec2(gl_GlobalInvocationID.xy);
+    vec4 color    = imageLoad(inImage, coords);
+
+    float grayVal = (color.r + color.g + color.b) / 3.0;
+    vec4 grayColor = vec4(grayVal, grayVal, grayVal, 1.0);
+
+    imageStore(outImage, coords, grayColor);
+}
