@@ -4,4 +4,5 @@
     <string name="CPU">CPU</string>
     <string name="GPU">GPU</string>
     <string name="SNAP">SNAP!</string>
+    <string name="Selection">Select transformation and CPU/GPU processing</string>
 </resources>
