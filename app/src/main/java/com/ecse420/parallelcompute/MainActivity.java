@@ -50,6 +50,11 @@ public class MainActivity extends AppCompatActivity {
     private String spvPath;       // for grayscale
     private String blurSpvPath;   // for blur
 
+    private EGLContextManager eglContextManager;
+    private OpenGLHelper openGLHelper;
+    private String[] processingModes = {"CPU", "Vulkan", "OpenGL ES"};
+    private int selectedProcessingMode = 0; // Default to CPU
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -75,6 +80,8 @@ public class MainActivity extends AppCompatActivity {
 
         bo = DataBindingUtil.setContentView(this, R.layout.activity_main);
         setupTransformationSpinner();
+        setupProcessingModeSpinner();
+        initializeOpenGL();
         onSwitchPressed();
         onCameraClick();
     }
@@ -121,6 +128,40 @@ public class MainActivity extends AppCompatActivity {
                 selectedTransformation = "Grayscale";
             }
         });
+    }
+
+    private void setupProcessingModeSpinner() {
+        Spinner processingModeSpinner = findViewById(R.id.processingModeSpinner);
+        if (processingModeSpinner != null) {
+            ArrayAdapter<String> adapter = new ArrayAdapter<>(
+                this, android.R.layout.simple_spinner_item, processingModes
+            );
+            adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+            processingModeSpinner.setAdapter(adapter);
+            
+            processingModeSpinner.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
+                @Override
+                public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
+                    selectedProcessingMode = position;
+                    Toast.makeText(MainActivity.this, "Using: " + processingModes[position], Toast.LENGTH_SHORT).show();
+                }
+                
+                @Override
+                public void onNothingSelected(AdapterView<?> parent) {
+                    selectedProcessingMode = 0; // Default to CPU
+                }
+            });
+        }
+    }
+
+    private void initializeOpenGL() {
+        eglContextManager = new EGLContextManager();
+        if (eglContextManager.init()) {
+            openGLHelper = new OpenGLHelper();
+            openGLHelper.init();
+        } else {
+            Toast.makeText(this, "Failed to initialize OpenGL ES", Toast.LENGTH_SHORT).show();
+        }
     }
 
     private void onSwitchPressed() {
@@ -187,80 +228,109 @@ public class MainActivity extends AppCompatActivity {
             int width = photo.getWidth();
             int height = photo.getHeight();
 
-            // Check if GPU is toggled
-            if (aSwitch.isChecked()) {
-                if ("Grayscale".equals(selectedTransformation)) {
-                    // ====================================
-                    // GPU path - Use grayscale shader
-                    // ====================================
+            // Choose processing method based on selection
+            switch (selectedProcessingMode) {
+                case 1: // Vulkan
+                    if ("Grayscale".equals(selectedTransformation)) {
+                        // ====================================
+                        // GPU path - Use grayscale shader
+                        // ====================================
 
-                    // Re-init Vulkan with the grayscale pipeline
-                    NativeVulkan.cleanupVulkan();
-                    NativeVulkan.initVulkan(spvPath);
+                        // Re-init Vulkan with the grayscale pipeline
+                        NativeVulkan.cleanupVulkan();
+                        NativeVulkan.initVulkan(spvPath);
 
-                    ByteBuffer inBuffer = ByteBuffer.allocateDirect(width * height * 4);
-                    photo.copyPixelsToBuffer(inBuffer);
-                    inBuffer.rewind();
+                        ByteBuffer inBuffer = ByteBuffer.allocateDirect(width * height * 4);
+                        photo.copyPixelsToBuffer(inBuffer);
+                        inBuffer.rewind();
 
-                    ByteBuffer outBuffer = ByteBuffer.allocateDirect(width * height * 4);
+                        ByteBuffer outBuffer = ByteBuffer.allocateDirect(width * height * 4);
 
-                    long gpuStart = System.nanoTime();
-                    NativeVulkan.runComputeShader(inBuffer, width, height, outBuffer);
-                    long gpuEnd = System.nanoTime();
-                    timeMs = (gpuEnd - gpuStart) / 1_000_000;
-                    mode = "GPU";
+                        long gpuStart = System.nanoTime();
+                        NativeVulkan.runComputeShader(inBuffer, width, height, outBuffer);
+                        long gpuEnd = System.nanoTime();
+                        timeMs = (gpuEnd - gpuStart) / 1_000_000;
+                        mode = "GPU (Vulkan)";
 
-                    outBuffer.rewind();
-                    transformed = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888);
-                    transformed.copyPixelsFromBuffer(outBuffer);
+                        outBuffer.rewind();
+                        transformed = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888);
+                        transformed.copyPixelsFromBuffer(outBuffer);
 
-                } else if ("Blur".equals(selectedTransformation)) {
-                    // ====================================
-                    // GPU path - Use blur shader
-                    // ====================================
+                    } else if ("Blur".equals(selectedTransformation)) {
+                        // ====================================
+                        // GPU path - Use blur shader
+                        // ====================================
 
-                    // Re-init Vulkan with the blur pipeline
-                    NativeVulkan.cleanupVulkan();
-                    NativeVulkan.initVulkan(blurSpvPath);
+                        // Re-init Vulkan with the blur pipeline
+                        NativeVulkan.cleanupVulkan();
+                        NativeVulkan.initVulkan(blurSpvPath);
 
-                    ByteBuffer inBuffer = ByteBuffer.allocateDirect(width * height * 4);
-                    photo.copyPixelsToBuffer(inBuffer);
-                    inBuffer.rewind();
+                        ByteBuffer inBuffer = ByteBuffer.allocateDirect(width * height * 4);
+                        photo.copyPixelsToBuffer(inBuffer);
+                        inBuffer.rewind();
 
-                    ByteBuffer outBuffer = ByteBuffer.allocateDirect(width * height * 4);
+                        ByteBuffer outBuffer = ByteBuffer.allocateDirect(width * height * 4);
 
-                    long gpuStart = System.nanoTime();
-                    NativeVulkan.runComputeShader(inBuffer, width, height, outBuffer);
-                    long gpuEnd = System.nanoTime();
-                    timeMs = (gpuEnd - gpuStart) / 1_000_000;
-                    mode = "GPU";
+                        long gpuStart = System.nanoTime();
+                        NativeVulkan.runComputeShader(inBuffer, width, height, outBuffer);
+                        long gpuEnd = System.nanoTime();
+                        timeMs = (gpuEnd - gpuStart) / 1_000_000;
+                        mode = "GPU (Vulkan)";
 
-                    outBuffer.rewind();
-                    transformed = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888);
-                    transformed.copyPixelsFromBuffer(outBuffer);
+                        outBuffer.rewind();
+                        transformed = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888);
+                        transformed.copyPixelsFromBuffer(outBuffer);
 
-                } else {
-                    // ====================================
-                    // GPU is on but transformation is not
-                    // Grayscale or Blur => fallback to CPU
-                    // ====================================
+                    } else {
+                        // ====================================
+                        // GPU is on but transformation is not
+                        // Grayscale or Blur => fallback to CPU
+                        // ====================================
+                        long cpuStart = android.os.Debug.threadCpuTimeNanos();
+                        transformed = applyCpuTransform(photo);
+                        long cpuEnd = android.os.Debug.threadCpuTimeNanos();
+
+                        timeMs = (cpuEnd - cpuStart) / 1_000_000;
+                        mode = "CPU";
+                    }
+                    break;
+
+                case 2: // OpenGL ES
+                    if ("Blur".equals(selectedTransformation)) {
+                        // Use OpenGL ES for blur
+                        if (openGLHelper != null) {
+                            long glStart = System.nanoTime();
+                            transformed = openGLHelper.applyBlur(photo);
+                            long glEnd = System.nanoTime();
+                            timeMs = (glEnd - glStart) / 1_000_000;
+                            mode = "GPU (OpenGL ES)";
+                        } else {
+                            // Fallback to CPU if OpenGL initialization failed
+                            long cpuStart = android.os.Debug.threadCpuTimeNanos();
+                            transformed = applyBlur(photo);
+                            long cpuEnd = android.os.Debug.threadCpuTimeNanos();
+                            timeMs = (cpuEnd - cpuStart) / 1_000_000;
+                            mode = "CPU (OpenGL ES fallback)";
+                        }
+                    } else {
+                        // For non-blur transformations, fall back to CPU for now
+                        long cpuStart = android.os.Debug.threadCpuTimeNanos();
+                        transformed = applyCpuTransform(photo);
+                        long cpuEnd = android.os.Debug.threadCpuTimeNanos();
+                        timeMs = (cpuEnd - cpuStart) / 1_000_000;
+                        mode = "CPU";
+                    }
+                    break;
+
+                case 0: // CPU (default)
+                default:
+                    // Existing CPU code
                     long cpuStart = android.os.Debug.threadCpuTimeNanos();
                     transformed = applyCpuTransform(photo);
                     long cpuEnd = android.os.Debug.threadCpuTimeNanos();
-
                     timeMs = (cpuEnd - cpuStart) / 1_000_000;
                     mode = "CPU";
-                }
-            } else {
-                // ====================================
-                // CPU path
-                // ====================================
-                long cpuStart = android.os.Debug.threadCpuTimeNanos();
-                transformed = applyCpuTransform(photo);
-                long cpuEnd = android.os.Debug.threadCpuTimeNanos();
-
-                timeMs = (cpuEnd - cpuStart) / 1_000_000;
-                mode = "CPU";
+                    break;
             }
 
             // ============================
@@ -384,6 +454,14 @@ public class MainActivity extends AppCompatActivity {
 
     @Override
     protected void onDestroy() {
+        // Clean up OpenGL resources
+        if (openGLHelper != null) {
+            openGLHelper.cleanup();
+        }
+        if (eglContextManager != null) {
+            eglContextManager.release();
+        }
+
         super.onDestroy();
         NativeVulkan.cleanupVulkan();
     }
