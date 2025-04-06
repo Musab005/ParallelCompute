@@ -82,7 +82,6 @@ public class MainActivity extends AppCompatActivity {
         setupTransformationSpinner();
         setupProcessingModeSpinner();
         initializeOpenGL();
-        onSwitchPressed();
         onCameraClick();
     }
 
@@ -162,17 +161,6 @@ public class MainActivity extends AppCompatActivity {
         } else {
             Toast.makeText(this, "Failed to initialize OpenGL ES", Toast.LENGTH_SHORT).show();
         }
-    }
-
-    private void onSwitchPressed() {
-        aSwitch = bo.switchBtn;
-        aSwitch.setOnCheckedChangeListener((buttonView, isChecked) -> {
-            if (isChecked) {
-                aSwitch.setText(R.string.GPU);
-            } else {
-                aSwitch.setText(R.string.CPU);
-            }
-        });
     }
 
     private void onCameraClick() {

@@ -14,46 +14,39 @@
             android:layout_height="wrap_content"
             android:layout_marginTop="132dp"
             android:fontFamily="serif"
-            android:text="@string/SelectCPU"
+            android:text="@string/Selection"
+            android:textAlignment="center"
             android:textColor="@color/black"
             android:textSize="24sp"
             app:layout_constraintEnd_toEndOf="parent"
             app:layout_constraintStart_toStartOf="parent"
             app:layout_constraintTop_toTopOf="parent" />
 
-        <Switch
-            android:id="@+id/switch_btn"
-            android:layout_width="125dp"
-            android:layout_height="88dp"
-            android:layout_marginTop="88dp"
-            android:text="@string/CPU"
-            android:textSize="24sp"
-            app:layout_constraintEnd_toEndOf="@+id/textView"
-            app:layout_constraintHorizontal_bias="0.495"
-            app:layout_constraintStart_toStartOf="@+id/textView"
-            app:layout_constraintTop_toBottomOf="@+id/textView" />
-
         <Spinner
             android:id="@+id/transformationSpinner"
             android:layout_width="0dp"
-            android:layout_height="wrap_content"
+            android:layout_height="70dp"
             android:layout_marginStart="32dp"
-            android:layout_marginTop="24dp"
+            android:layout_marginTop="52dp"
             android:layout_marginEnd="32dp"
             app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintHorizontal_bias="0.0"
             app:layout_constraintStart_toStartOf="parent"
-            app:layout_constraintTop_toBottomOf="@+id/switch_btn" />
+            app:layout_constraintTop_toBottomOf="@+id/textView" />
 
         <Spinner
             android:id="@+id/processingModeSpinner"
             android:layout_width="0dp"
-            android:layout_height="wrap_content"
+            android:layout_height="70dp"
             android:layout_marginStart="32dp"
             android:layout_marginTop="16dp"
             android:layout_marginEnd="32dp"
+            app:layout_constraintBottom_toTopOf="@+id/button"
             app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintHorizontal_bias="0.0"
             app:layout_constraintStart_toStartOf="parent"
-            app:layout_constraintTop_toBottomOf="@+id/transformationSpinner" />
+            app:layout_constraintTop_toBottomOf="@+id/transformationSpinner"
+            app:layout_constraintVertical_bias="0.146" />
 
         <Button
             android:id="@+id/button"
