@@ -2,7 +2,7 @@ package com.ecse420.parallelcompute;
 
 public class NativeVulkan {
     static {
-        System.loadLibrary("nativevulkan"); // must match your library name from CMake
+        System.loadLibrary("nativevulkan");
     }
 
     public static native void initVulkan(String shaderPath);

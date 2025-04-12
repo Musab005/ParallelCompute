@@ -23,8 +23,6 @@
 
 // -----------------------------------------------------------------------------
 // Global context storing Vulkan objects used in compute
-// (For simplicity, we keep them all in static variables. In production, you'd
-//  manage them in a class or struct with proper lifecycle management.)
 // -----------------------------------------------------------------------------
 
 static VkInstance          g_Instance         = VK_NULL_HANDLE;
@@ -47,7 +45,7 @@ static VkDescriptorSet       g_DescriptorSet       = VK_NULL_HANDLE;
 static VkShaderModule        g_ComputeShaderModule = VK_NULL_HANDLE;
 
 // -----------------------------------------------------------------------------
-// Helper: Load SPIR-V from file
+// Helper function to load SPIR-V from file
 // -----------------------------------------------------------------------------
 static std::vector<char> loadFile(const std::string &filename) {
     std::ifstream file(filename, std::ios::ate | std::ios::binary);
@@ -64,7 +62,7 @@ static std::vector<char> loadFile(const std::string &filename) {
 }
 
 // -----------------------------------------------------------------------------
-// Helper: Create a shader module from SPIR-V code
+// Helper function to create a shader module from SPIR-V code
 // -----------------------------------------------------------------------------
 static VkShaderModule createShaderModule(const std::vector<char>& code) {
     VkShaderModuleCreateInfo createInfo = {};
@@ -78,7 +76,7 @@ static VkShaderModule createShaderModule(const std::vector<char>& code) {
 }
 
 // -----------------------------------------------------------------------------
-// Helper: Pick a physical device that has a compute queue
+// Helper function to pick a physical device that has a compute queue
 // -----------------------------------------------------------------------------
 static void pickPhysicalDevice() {
     uint32_t deviceCount = 0;
@@ -88,7 +86,7 @@ static void pickPhysicalDevice() {
     std::vector<VkPhysicalDevice> devices(deviceCount);
     vkEnumeratePhysicalDevices(g_Instance, &deviceCount, devices.data());
 
-    // Just pick the first device that has a compute queue
+    // pick the first device that has a compute queue
     for (auto& d : devices) {
         VkPhysicalDeviceProperties props;
         vkGetPhysicalDeviceProperties(d, &props);
@@ -114,7 +112,7 @@ static void pickPhysicalDevice() {
 }
 
 // -----------------------------------------------------------------------------
-// Simple struct to hold an image + memory + view
+// Struct to hold an image + memory + view
 // -----------------------------------------------------------------------------
 struct SimpleImage {
     VkImage       image  = VK_NULL_HANDLE;
@@ -125,8 +123,7 @@ struct SimpleImage {
 };
 
 // -----------------------------------------------------------------------------
-// Create a 2D image with VK_IMAGE_TILING_LINEAR (host-visible). Not all devices
-// support this in a fully portable manner, but it works for demonstration.
+// Create a 2D image with VK_IMAGE_TILING_LINEAR (host-visible)
 // -----------------------------------------------------------------------------
 static void createImage2D(int width, int height, SimpleImage& outImage) {
     outImage.width  = width;
